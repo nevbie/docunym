@@ -27,6 +27,8 @@ export interface Finding {
   fontSize: number;
   replacement: string;
   active: boolean;
+  /** Marked by the user (tapped), not by the detection. */
+  manual?: boolean;
 }
 
 /** Word without surrounding punctuation. */
@@ -110,6 +112,7 @@ export function detectKinds(lines: string[][]): (Kind | null)[][] {
       if (!(strong || (weak && nextIsNo))) continue;
       if (kinds[i] === 'name') kinds[i] = null; // "Karl-Marx-Allee" contains a first name
       mark(i, 'street');
+      if (nextIsNo) kinds[i + 1] = 'street'; // the house number belongs to the address
       // "Berliner Straße", "Am Alten Markt", "Karl-Marx-Allee"
       if (STREET_GENERIC.has(lc[i]) || raw[i - 1]?.endsWith('-')) {
         let j = i - 1;
@@ -127,7 +130,12 @@ export function detectKinds(lines: string[][]): (Kind | null)[][] {
       if (STREET_PREPOSITIONS.has(lc[i]) && isCap(c[i]) && isCap(c[i + 1]) && HOUSE_NO.test(raw[i + 2]) && i + 3 >= raw.length) {
         mark(i, 'street');
         mark(i + 1, 'street');
+        kinds[i + 2] = 'street';
       }
+    }
+    // "Postfach 4711"
+    for (let i = 0; i + 1 < raw.length; i++) {
+      if (lc[i] === 'postfach' && hasDigit(raw[i + 1])) { kinds[i] = 'street'; kinds[i + 1] = 'street'; }
     }
 
     // Cities after a postcode: "12345 Frankfurt am Main".
@@ -140,6 +148,7 @@ export function detectKinds(lines: string[][]): (Kind | null)[][] {
         } else break;
         if (/[,;]$/.test(raw[j])) break;
       }
+      if (n > 0 || kinds[i + 1] === 'city') kinds[i] = 'city'; // the postcode belongs to the address
     }
     return kinds;
   });
@@ -202,8 +211,11 @@ export class Dummies {
       }
       case 'email': return `${this.pick(FAKE_FIRST)}.${this.pick(FAKE_LAST)}@beispiel.de`.toLowerCase();
       case 'web': return 'www.beispiel.de';
-      case 'city': return /^\p{Ll}/u.test(core) ? core : this.pick(FAKE_CITY);
+      case 'city':
+        if (hasDigit(core)) return this.digits(core);
+        return /^\p{Ll}/u.test(core) ? core : this.pick(FAKE_CITY);
       case 'street': {
+        if (hasDigit(core)) return this.digits(core);
         const lc = core.toLowerCase().replace(/\.$/, '');
         if (STREET_GENERIC.has(lc)) return core;
         if (STREET_PREPOSITIONS.has(lc)) return core;
@@ -228,7 +240,8 @@ export function findPersonalData(lines: OcrLine[], dummies = new Dummies()): Fin
     const kind = kinds[li][wi];
     if (!kind) return;
     // A multi-word city ("Frankfurt am Main") becomes one dummy city.
-    const replacement = kind === 'city' && kinds[li][wi - 1] === 'city' ? '' : dummies.replace(w.text, kind);
+    const prevCity = kinds[li][wi - 1] === 'city' && !hasDigit(line.words[wi - 1].text);
+    const replacement = kind === 'city' && prevCity && !hasDigit(w.text) ? '' : dummies.replace(w.text, kind);
     out.push({ line: li, word: wi, kind, text: w.text, bbox: w.bbox, ...textPlacement(line, w.bbox), replacement, active: true });
   }));
   return out;
@@ -252,7 +265,7 @@ export function textPlacement(line: OcrLine, b: Box): { baseline: number; fontSi
 export function manualFinding(lines: OcrLine[], li: number, wi: number, dummies: Dummies): Finding {
   const w = lines[li].words[wi];
   const kind = classifyWord(w.text) ?? 'other';
-  return { line: li, word: wi, kind, text: w.text, bbox: w.bbox, ...textPlacement(lines[li], w.bbox), replacement: dummies.replace(w.text, kind), active: true };
+  return { line: li, word: wi, kind, text: w.text, bbox: w.bbox, ...textPlacement(lines[li], w.bbox), replacement: dummies.replace(w.text, kind), active: true, manual: true };
 }
 
 export type RGB = [number, number, number];

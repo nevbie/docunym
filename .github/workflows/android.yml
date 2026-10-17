@@ -33,6 +33,11 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
 
+      - name: Check OCR files are in the APK
+        run: |
+          unzip -l android/app/build/outputs/apk/release/app-release.apk | grep tesseract | tee ocr.txt
+          for f in worker.min.js tesseract-core-lstm.wasm.js deu.traineddata; do grep -q "public/tesseract/$f\$" ocr.txt; done
+
       # Privacy guarantee: fail the build if the app could ever reach the network.
       - name: Check APK has no internet permission
         run: |

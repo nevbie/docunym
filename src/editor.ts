@@ -4,7 +4,9 @@ import {
   anonymousFileName, CATEGORY_OF, Dummies, findPersonalData, manualFinding,
   type Box, type Category, type Finding, type OcrLine,
 } from './core/detect';
-import { ColorSampler, drawRedactions, type Mode } from './render';
+import { actionFor, planRedactions, type Action, type Actions } from './core/plan';
+import type { PersonRegistry } from './core/persons';
+import { ColorSampler, drawItems } from './render';
 
 export const CATEGORY_LABEL: Record<Category, string> = { name: 'Namen', address: 'Adressen', number: 'Zahlen', contact: 'Kontakt' };
 export const CATEGORY_COLOR: Record<Category, string> = { name: '#f2a541', address: '#4aa3df', number: '#b48cf2', contact: '#5cc98a' };
@@ -17,11 +19,9 @@ export class Editor {
   readonly lines: OcrLine[];
   findings: Finding[];
   manual: Box[] = [];
-  mode: Mode = 'black';
   preview = false;
   onChange: () => void = () => {};
 
-  private dummies = new Dummies();
   private colors: ColorSampler;
   private history: Snapshot[] = [];
   private ctx: CanvasRenderingContext2D;
@@ -33,7 +33,10 @@ export class Editor {
   private raf = 0;
   private resizeObserver: ResizeObserver;
 
-  constructor(private canvas: HTMLCanvasElement, readonly source: HTMLCanvasElement, lines: OcrLine[]) {
+  constructor(
+    private canvas: HTMLCanvasElement, readonly source: HTMLCanvasElement, lines: OcrLine[],
+    public actions: Actions, private persons: PersonRegistry, private dummies: Dummies,
+  ) {
     this.lines = lines;
     this.findings = findPersonalData(lines, this.dummies);
     this.colors = new ColorSampler(source);
@@ -70,30 +73,26 @@ export class Editor {
   }
   private changed() { this.onChange(); this.draw(); }
 
-  counts(): Record<Category, { total: number; active: number }> {
-    const c = { name: { total: 0, active: 0 }, address: { total: 0, active: 0 }, number: { total: 0, active: 0 }, contact: { total: 0, active: 0 } };
-    for (const f of this.findings) { const k = c[CATEGORY_OF[f.kind]]; k.total++; if (f.active) k.active++; }
+  /** Per category: how many words were found and how many of them will be changed. */
+  counts(): Record<Category, { total: number; applied: number }> {
+    const c = { name: { total: 0, applied: 0 }, address: { total: 0, applied: 0 }, number: { total: 0, applied: 0 }, contact: { total: 0, applied: 0 } };
+    for (const f of this.findings) { const k = c[CATEGORY_OF[f.kind]]; k.total++; if (actionFor(f, this.actions)) k.applied++; }
     return c;
   }
-  toggleCategory(cat: Category): void {
-    const list = this.findings.filter((f) => CATEGORY_OF[f.kind] === cat);
-    if (!list.length) return;
-    this.remember();
-    const on = !list.some((f) => f.active);
-    for (const f of list) f.active = on;
+  setAction(cat: Category, a: Action): void {
+    this.actions = { ...this.actions, [cat]: a };
     this.changed();
   }
   /** Marks all recognised text (e.g. for a chat screenshot). */
   markAllText(): void {
     this.remember();
     const have = new Set(this.findings.map((f) => `${f.line}:${f.word}`));
-    for (const f of this.findings) f.active = true;
+    for (const f of this.findings) { f.active = true; f.manual = true; }
     this.lines.forEach((l, li) => l.words.forEach((_, wi) => {
       if (!have.has(`${li}:${wi}`)) this.findings.push(manualFinding(this.lines, li, wi, this.dummies));
     }));
     this.changed();
   }
-  setMode(m: Mode): void { this.mode = m; this.changed(); }
   setPreview(p: boolean): void { this.preview = p; this.draw(); }
 
   // ---- view --------------------------------------------------------------
@@ -135,12 +134,13 @@ export class Editor {
     ctx.drawImage(this.source, 0, 0);
     const px = 1 / this.scale;
     if (this.preview) {
-      drawRedactions(ctx, this.findings, this.manual, this.mode, this.colors);
+      // A fork, so a preview never adds anybody to the remembered person list.
+      drawItems(ctx, planRedactions(this.findings, this.manual, this.actions, this.persons.fork()), this.colors);
     } else {
       for (const f of this.findings) {
         const col = CATEGORY_COLOR[CATEGORY_OF[f.kind]];
         const b = f.bbox;
-        if (f.active) {
+        if (actionFor(f, this.actions)) {
           ctx.globalAlpha = 0.38;
           ctx.fillStyle = col;
           ctx.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
@@ -273,7 +273,13 @@ export class Editor {
       if (inside(this.manual[i], 0)) { this.remember(); this.manual.splice(i, 1); this.changed(); return; }
     }
     const f = this.findings.find((t) => inside(t.bbox, slack));
-    if (f) { this.remember(); f.active = !f.active; this.changed(); return; }
+    if (f) {
+      this.remember();
+      if (actionFor(f, this.actions)) { f.active = false; f.manual = false; }
+      else { f.active = true; f.manual = true; } // also covers a word of a "keep" category
+      this.changed();
+      return;
+    }
     for (let li = 0; li < this.lines.length; li++) {
       const wi = this.lines[li].words.findIndex((w) => inside(w.bbox, slack));
       if (wi >= 0) { this.remember(); this.findings.push(manualFinding(this.lines, li, wi, this.dummies)); this.changed(); return; }
@@ -287,6 +293,8 @@ export class Editor {
    * Canvas encoding writes no EXIF data (no GPS, date, camera model) – the file has no link to the original.
    */
   async export(): Promise<{ blob: Blob; name: string }> {
+    // The real person list: pseudonyms used in a saved picture are remembered.
+    const items = planRedactions(this.findings, this.manual, this.actions, this.persons);
     const s = Math.min(1, MAX_EXPORT / Math.max(this.source.width, this.source.height));
     const out = document.createElement('canvas');
     out.width = Math.round(this.source.width * s);
@@ -294,7 +302,7 @@ export class Editor {
     const ctx = out.getContext('2d')!;
     ctx.scale(s, s);
     ctx.drawImage(this.source, 0, 0);
-    drawRedactions(ctx, this.findings, this.manual, this.mode, this.colors);
+    drawItems(ctx, items, this.colors);
     const blob = await new Promise<Blob>((resolve, reject) =>
       out.toBlob((b) => (b ? resolve(b) : reject(new Error('Bild konnte nicht erzeugt werden'))), 'image/jpeg', 0.9));
     out.width = out.height = 0;

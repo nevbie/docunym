@@ -8,6 +8,8 @@ screenshots fully offline. APK built by `.github/workflows/android.yml`.
 - **Never add network access**: no INTERNET permission (the CI checks the APK), no CDN URLs, no analytics,
   keep the CSP in `index.html` strict. OCR files are bundled by `scripts/copy-ocr.mjs`.
 - Exported images must stay re-encoded canvas pixels (no EXIF) with a random file name (`anonymousFileName`).
-- Detection/replacement logic lives in `src/core/` (no DOM) and is covered by `tests/detect.test.ts`.
+- Detection/replacement logic lives in `src/core/` (no DOM) and is covered by `tests/` (detection, actions, pseudonyms).
+- Local storage keys: `docunym.settings` (actions per category), `docunym.persons` (pseudonym list). Only add
+  optional fields, never drop users' person lists.
 - Before pushing: `npx tsc --noEmit && npx vitest run && npm run build`.
 - `android/app/anonymisierer.keystore` is the fixed signing key (updates install over the old app). Don't replace it.

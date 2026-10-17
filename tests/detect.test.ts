@@ -37,18 +37,21 @@ describe('detectKinds', () => {
   });
 
   it('finds streets', () => {
-    expect(marked('Hauptstraße 12')).toEqual(['Hauptstraße=street', '12=number']);
-    expect(marked('Berliner Straße 5a')).toEqual(['Berliner=street', 'Straße=street', '5a=number']);
-    expect(marked('Am Mühlbach 3')).toEqual(['Am=street', 'Mühlbach=street', '3=number']);
-    expect(marked('Karl-Marx-Allee 90')).toEqual(['Karl-Marx-Allee=street', '90=number']);
-    expect(marked('Lindenweg 7')).toEqual(['Lindenweg=street', '7=number']);
+    expect(marked('Hauptstraße 12')).toEqual(['Hauptstraße=street', '12=street']);
+    expect(marked('Berliner Straße 5a')).toEqual(['Berliner=street', 'Straße=street', '5a=street']);
+    expect(marked('Am Mühlbach 3')).toEqual(['Am=street', 'Mühlbach=street', '3=street']);
+    expect(marked('Karl-Marx-Allee 90')).toEqual(['Karl-Marx-Allee=street', '90=street']);
+    expect(marked('Lindenweg 7')).toEqual(['Lindenweg=street', '7=street']);
+    expect(marked('Postfach 4711, 34117 Kassel')).toEqual(['Postfach=street', '4711,=street', '34117=city', 'Kassel=city']);
     // weak suffix without house number is not a street
     expect(marked('Der Weg war weit')).toEqual([]);
   });
 
   it('finds the city after a postcode', () => {
-    expect(marked('60311 Frankfurt am Main')).toEqual(['60311=number', 'Frankfurt=city', 'am=city', 'Main=city']);
-    expect(marked('D-80331 München, Deutschland')).toEqual(['D-80331=number', 'München,=city']);
+    expect(marked('60311 Frankfurt am Main')).toEqual(['60311=city', 'Frankfurt=city', 'am=city', 'Main=city']);
+    expect(marked('D-80331 München, Deutschland')).toEqual(['D-80331=city', 'München,=city']);
+    // a lone five-digit number is just a number
+    expect(marked('Betrag 12345 euro')).toEqual(['12345=number']);
   });
 
   it('finds e-mail addresses and web addresses', () => {
@@ -101,6 +104,7 @@ describe('findPersonalData', () => {
     const lines: OcrLine[] = [{ bbox: box(0), words: ['60311', 'Frankfurt', 'am', 'Main'].map((text, i) => ({ text, bbox: box(i * 20) })) }];
     const f = findPersonalData(lines, new Dummies(5));
     expect(f.map((x) => x.replacement !== '')).toEqual([true, true, false, false]);
+    expect(f[0].replacement).toMatch(/^[1-9]\d{4}$/);
   });
 });
 

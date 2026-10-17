@@ -16,5 +16,11 @@ export const icons = {
   fit: svg('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'),
   block: svg('<rect x="4" y="8" width="16" height="8" rx="1" fill="currentColor" stroke="none"/>'),
   text: svg('<path d="M5 6h14M12 6v13M9 19h6"/>'),
+  next: svg('<path d="M9 5l7 7-7 7"/>'),
+  check: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+  person: svg('<circle cx="12" cy="8" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>'),
+  pen: svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'),
+  trash: svg('<path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13"/>'),
+  keep: svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
   wifiOff: svg('<path d="M3 3l18 18"/><path d="M8.5 16.5a5 5 0 0 1 7 0M5 12.6a10 10 0 0 1 4.2-2.4M12.7 9.7A10 10 0 0 1 19 12.6M2 9a15 15 0 0 1 4.3-2.8M10 5.1A15 15 0 0 1 22 9"/><circle cx="12" cy="20" r=".6" fill="currentColor"/>'),
 };

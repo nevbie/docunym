@@ -1,13 +1,9 @@
-// Draws the redactions (black bars or dummy text) onto a canvas in image coordinates.
-import { estimateColors, type Box, type Finding, type RGB } from './core/detect';
-
-export type Mode = 'black' | 'replace';
+// Draws the planned redactions (black bars, covers with dummy text or pseudonyms) onto a canvas
+// in image coordinates.
+import { estimateColors, type Box, type RGB } from './core/detect';
+import type { DrawItem } from './core/plan';
 
 const rgb = (c: RGB) => `rgb(${c[0]},${c[1]},${c[2]})`;
-const pad = (b: Box, f: number, min: number): Box => {
-  const p = Math.max(min, (b.y1 - b.y0) * f);
-  return { x0: b.x0 - p, y0: b.y0 - p, x1: b.x1 + p, y1: b.y1 + p };
-};
 const fill = (ctx: CanvasRenderingContext2D, b: Box) => ctx.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);
 
 /** Paper and ink colours of the original picture around a box (cached per box). */
@@ -27,40 +23,30 @@ export class ColorSampler {
   }
 }
 
-export function drawRedactions(
-  ctx: CanvasRenderingContext2D, findings: Finding[], manual: Box[], mode: Mode, colors: ColorSampler,
-): void {
+export function drawItems(ctx: CanvasRenderingContext2D, items: DrawItem[], colors: ColorSampler): void {
   ctx.save();
-  if (mode === 'black') {
-    ctx.fillStyle = '#000';
-    for (const f of findings) if (f.active) fill(ctx, pad(f.bbox, 0.18, 2));
-    for (const b of manual) fill(ctx, b);
-  } else {
-    // First cover everything, then write – so a neighbour's cover never cuts into dummy text.
-    for (const f of findings) {
-      if (!f.active) continue;
-      ctx.fillStyle = rgb(colors.get(f.bbox).bg);
-      fill(ctx, pad(f.bbox, 0.15, 2));
-    }
-    for (const b of manual) {
-      ctx.fillStyle = rgb(colors.get(b).bg);
-      fill(ctx, b);
-    }
-    ctx.textBaseline = 'alphabetic';
-    for (const f of findings) {
-      if (!f.active || !f.replacement) continue;
-      const size = Math.max(6, f.fontSize);
-      ctx.font = `${size}px Arial, Helvetica, sans-serif`;
-      ctx.fillStyle = rgb(colors.get(f.bbox).fg);
-      const width = ctx.measureText(f.replacement).width;
-      const room = (f.bbox.x1 - f.bbox.x0) + size * 0.1;
-      const sx = width > room ? room / width : 1;
-      ctx.save();
-      ctx.translate(f.bbox.x0, f.baseline);
-      ctx.scale(sx, 1);
-      ctx.fillText(f.replacement, 0, 0);
-      ctx.restore();
-    }
+  // First all covers, then the text – so a neighbour's cover never cuts into dummy text.
+  for (const it of items) {
+    ctx.fillStyle = it.type === 'black' ? '#000' : rgb(colors.get(it.box).bg);
+    fill(ctx, it.box);
+  }
+  ctx.textBaseline = 'alphabetic';
+  for (const it of items) {
+    if (it.type !== 'cover' || !it.text) continue;
+    const size = Math.max(6, it.fontSize);
+    ctx.font = `${size}px Arial, Helvetica, sans-serif`;
+    ctx.fillStyle = rgb(colors.get(it.box).fg);
+    const width = ctx.measureText(it.text).width;
+    const room = it.width + size * 0.1;
+    // Squeeze long text a little; beyond that make it smaller (keeps "Person A" readable over "Max").
+    const fit = width > room ? room / width : 1;
+    const sx = Math.max(fit, 0.72);
+    const sy = fit < 0.72 ? fit / 0.72 : 1;
+    ctx.save();
+    ctx.translate(it.x, it.baseline);
+    ctx.scale(sx * sy, sy);
+    ctx.fillText(it.text, 0, 0);
+    ctx.restore();
   }
   ctx.restore();
 }
