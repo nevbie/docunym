@@ -1,5 +1,5 @@
 {
-  "name": "doc-anonymizer",
+  "name": "docunym",
   "version": "0.1.0",
   "scripts": {
     "predev": "node scripts/copy-ocr.mjs",
