@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.nevbie.anonymisierer',
-  appName: 'Anonymisierer',
+  appName: 'Docunym',
   webDir: 'dist',
   android: { backgroundColor: '#0d1117' },
 };

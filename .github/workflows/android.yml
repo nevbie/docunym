@@ -41,7 +41,7 @@ jobs:
           ! grep -q "android.permission.INTERNET" perms.txt
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk anonymisierer.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk docunym.apk
 
       # Releases instead of build artifacts: they don't count against the account's artifact storage
       # and the APK can be downloaded directly on the phone. Only main publishes ("latest");
@@ -53,6 +53,6 @@ jobs:
         run: |
           gh release delete preview --yes --cleanup-tag || true
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest anonymisierer.apk --target "$GITHUB_SHA" \
-            --title "Anonymisierer 0.1.${{ github.run_number }}" \
-            --notes "Auf dem Android-Handy anonymisierer.apk herunterladen und installieren."
+          gh release create latest docunym.apk --target "$GITHUB_SHA" \
+            --title "Docunym 0.1.${{ github.run_number }}" \
+            --notes "Auf dem Android-Handy docunym.apk herunterladen und installieren."

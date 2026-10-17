@@ -1,4 +1,4 @@
-# Anonymisierer – notes for working on this repo
+# Docunym – notes for working on this repo
 
 Android app (Capacitor 8, TypeScript, Canvas 2D, Tesseract.js) that anonymises photos of documents and
 screenshots fully offline. APK built by `.github/workflows/android.yml`.

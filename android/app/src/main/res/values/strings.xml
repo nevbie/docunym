@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Anonymisierer</string>
-    <string name="title_activity_main">Anonymisierer</string>
+    <string name="app_name">Docunym</string>
+    <string name="title_activity_main">Docunym</string>
     <string name="package_name">com.nevbie.anonymisierer</string>
     <string name="custom_url_scheme">com.nevbie.anonymisierer</string>
 </resources>

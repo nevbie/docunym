@@ -1,4 +1,4 @@
-# Anonymisierer
+# Docunym
 
 Android-App zum Anonymisieren von fotografierten Dokumenten und Screenshots, **komplett offline**.
 

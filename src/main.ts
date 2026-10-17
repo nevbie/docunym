@@ -44,7 +44,7 @@ function showStart() {
   const el = h('div', { class: 'start' }, `
     <div class="brand">
       <div class="logo">${icons.shield}</div>
-      <div><h1>Anonymisierer</h1><p>Dokumente und Screenshots anonymisieren – direkt auf dem Handy.</p></div>
+      <div><h1>Docunym</h1><p>Dokumente und Screenshots anonymisieren – direkt auf dem Handy.</p></div>
     </div>
     <div class="big-actions">
       <button class="big primary" data-a="camera">${icons.camera}<div><b>Dokument fotografieren</b><span>Kamera öffnen</span></div></button>
