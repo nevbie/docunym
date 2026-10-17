@@ -2,7 +2,7 @@
 // Pure logic – no canvas, no Tesseract – so it can be unit tested.
 import {
   CITY_PARTICLES, FAKE_CITY, FAKE_FIRST, FAKE_LAST, FAKE_STREET, FAKE_STREET_PART, FIRST_NAMES, LAST_NAMES,
-  NAME_LABELS, NAME_PARTICLES, NAME_SALUTATIONS, STREET_GENERIC, STREET_PREPOSITIONS, STREET_STRONG, STREET_WEAK, TITLES,
+  NAME_LABELS, NAME_PARTICLES, NAME_SALUTATIONS, NOT_NAMES, STREET_GENERIC, STREET_PREPOSITIONS, STREET_STRONG, STREET_WEAK, TITLES,
 } from './lists';
 
 export interface Box { x0: number; y0: number; x1: number; y1: number }
@@ -63,6 +63,27 @@ export function detectKinds(lines: string[][]): (Kind | null)[][] {
     const mark = (i: number, k: Kind) => { if (i >= 0 && i < raw.length && c[i] && !kinds[i]) kinds[i] = k; };
     const markName = (i: number) => mark(i, 'name');
 
+    // Could word j be part of a name? Not a label, not a common document word, at least two letters.
+    const nameLike = (j: number) => isCap(c[j]) && c[j].length >= 2 && !kinds[j]
+      && !NOT_NAMES.has(lc[j]) && !NAME_LABELS.has(lc[j]) && !NAME_SALUTATIONS.has(lc[j]) && !TITLES.has(lc[j]);
+    const isFirstName = (j: number) => c[j].split('-').some((p) => FIRST_NAMES.has(p.toLowerCase()));
+    /**
+     * Marks the name starting at word j: one or two words, a third only after a known first name
+     * ("Anna Maria Müller"), so the next word on the line ("Nürnberg") is not taken as well.
+     */
+    const takeName = (j: number, stopAtPunct: boolean) => {
+      let taken = 0;
+      while (j < raw.length && taken < 3) {
+        if (NAME_PARTICLES.has(lc[j]) && taken > 0 && j + 1 < raw.length && nameLike(j + 1)) { markName(j); j++; continue; }
+        if (!c[j] || !nameLike(j)) break;
+        if (taken === 2 && !isFirstName(j - 1)) break;
+        markName(j);
+        taken++;
+        if (stopAtPunct && /[,.;:!?]$/.test(raw[j])) break;
+        j++;
+      }
+    };
+
     // Names after salutations ("Frau Dr. Anna Müller") and labels ("Name: Müller, Anna").
     for (let i = 0; i < raw.length; i++) {
       const salutation = NAME_SALUTATIONS.has(lc[i]);
@@ -72,34 +93,18 @@ export function detectKinds(lines: string[][]): (Kind | null)[][] {
       if (label && !isCap(c[i])) continue;
       let j = i + 1;
       while (j < raw.length && TITLES.has(lc[j])) j++;
-      let taken = 0;
-      while (j < raw.length && taken < 3) {
-        if (!c[j] || kinds[j]) break;
-        if (NAME_PARTICLES.has(lc[j]) && j + 1 < raw.length && isCap(c[j + 1])) { markName(j); j++; continue; }
-        if (!isCap(c[j]) || NAME_LABELS.has(lc[j]) || NAME_SALUTATIONS.has(lc[j])) break;
-        markName(j);
-        taken++;
-        if (salutation && /[,.;:!?]$/.test(raw[j])) break;
-        j++;
-      }
+      takeName(j, salutation);
     }
 
     // Known first and last names, including the surrounding parts of the full name.
     for (let i = 0; i < raw.length; i++) {
-      if (!isCap(c[i]) || !isNameWord(c[i])) continue;
-      const isFirst = c[i].split('-').some((p) => FIRST_NAMES.has(p.toLowerCase()));
-      markName(i);
-      if (isFirst) {
-        // "Anna Maria Müller", "Anna von Berg"
-        for (let j = i + 1, n = 0; j < raw.length && n < 2; j++) {
-          if (/[,.;:]$/.test(raw[j - 1])) break;
-          if (NAME_PARTICLES.has(lc[j]) && j + 1 < raw.length && isCap(c[j + 1])) { markName(j); continue; }
-          if (!isCap(c[j]) || kinds[j]) break;
-          markName(j);
-          n++;
-        }
+      if (!nameLike(i) || !isNameWord(c[i])) continue;
+      if (isFirstName(i)) {
+        takeName(i, true); // "Anna Maria Müller", "Anna von Berg"
         // "Müller, Anna"
-        if (i > 0 && raw[i - 1].endsWith(',') && isCap(c[i - 1])) markName(i - 1);
+        if (i > 0 && raw[i - 1].endsWith(',') && nameLike(i - 1)) markName(i - 1);
+      } else {
+        markName(i);
       }
     }
 

@@ -1,7 +1,7 @@
 import './style.css';
 import { Dummies, type Category, type OcrLine } from './core/detect';
 import { ACTION_OPTIONS, parseActions, type Action, type Actions } from './core/plan';
-import { PersonRegistry, type KeyValueStore } from './core/persons';
+import { PersonRegistry, type KeyValueStore, type Person } from './core/persons';
 import { CATEGORY_COLOR, CATEGORY_LABEL, Editor } from './editor';
 import { icons } from './icons';
 import { recognize, warmUp } from './ocr';
@@ -126,9 +126,16 @@ const errText = (e: unknown) => String((e as Error)?.message ?? e);
 
 // ---- person list -----------------------------------------------------------
 
+const cap = (s: string) => s.replace(/(^|[\s-])\p{L}/gu, (m) => m.toUpperCase());
+/** "Elisabeth Birkhold, auch: Frau Birkhold" – known name parts plus manually assigned spellings. */
+function personNames(p: Person): string {
+  const parts = [...p.first, ...p.last].map(cap).join(' ');
+  const aliases = Object.entries(persons.aliases).filter(([, l]) => l === p.label).map(([k]) => cap(k));
+  return aliases.length ? `${parts} · zugeordnet: ${aliases.join(', ')}` : parts;
+}
+
 function showPersons() {
   app.replaceChildren();
-  const cap = (s: string) => s.replace(/(^|[\s-])\p{L}/gu, (m) => m.toUpperCase());
   const bar = h('div', { class: 'bar' }, `
     <button class="icon-btn" data-a="back" aria-label="Zurück">${icons.close}</button>
     <h2>Personen-Liste</h2>`);
@@ -141,11 +148,19 @@ function showPersons() {
     }
     list.append(h('p', { class: 'note' }, 'Nur auf diesem Gerät gespeichert. Gleiche Person bekommt in jedem Bild das gleiche Pseudonym.'));
     for (const p of persons.persons) {
-      const names = esc([...p.first.map(cap), ...p.last.map(cap)].join(', '));
+      const names = esc(personNames(p));
       const row = h('div', { class: 'person' }, `
         <div><b>${esc(p.label)}</b><span>${names}</span></div>
+        <button class="icon-btn" data-a="merge" aria-label="Zusammenführen">${icons.merge}</button>
         <button class="icon-btn" data-a="rename" aria-label="Umbenennen">${icons.pen}</button>
         <button class="icon-btn" data-a="delete" aria-label="Löschen">${icons.trash}</button>`);
+      row.querySelector('[data-a=merge]')!.addEventListener('click', async () => {
+        const others = persons.persons.filter((x) => x !== p);
+        if (!others.length) return toast('Keine andere Person zum Zusammenführen.');
+        const into = await sheet(`${p.label} ist dieselbe Person wie …`,
+          others.map((x) => ({ value: x.label, label: x.label, hint: personNames(x) })));
+        if (into) { persons.merge(p.label, into); render(); toast(`${p.label} gehört jetzt zu ${into}`); }
+      });
       row.querySelector('[data-a=rename]')!.addEventListener('click', () => {
         const n = prompt('Neues Pseudonym:', p.label);
         if (n) { persons.rename(p.label, n); render(); }
@@ -252,7 +267,7 @@ function showEditor(source: HTMLCanvasElement, lines: OcrLine[]) {
       <button data-a="zout" aria-label="Verkleinern">${icons.zoomOut}</button>
       <button data-a="fit" aria-label="Ganzes Bild">${icons.fit}</button>
     </div>`);
-  const hint = h('div', { class: 'hint' }, 'Tippen: an/aus · Ziehen: abdecken · Zwei Finger: zoomen');
+  const hint = h('div', { class: 'hint' });
   const panel = h('div', { class: 'panel' }, `
     <div class="chips"></div>
     <div class="row">
@@ -289,10 +304,31 @@ function showEditor(source: HTMLCanvasElement, lines: OcrLine[]) {
       });
       chips.append(chip);
     }
+    hint.textContent = ed.actions.name === 'pseudo'
+      ? 'Name antippen: Person zuordnen · Ziehen: abdecken · Zwei Finger: zoomen'
+      : 'Tippen: an/aus · Ziehen: abdecken · Zwei Finger: zoomen';
     q('[data-a=undo]').disabled = !ed.canUndo();
     q('[data-a=preview]').classList.toggle('on', ed.preview);
   };
   ed.onChange = update;
+  ed.onPseudoTap = async (words) => {
+    const written = words.join(' ').replace(/[,.;:!?]$/, '');
+    ed.commitPseudonyms();
+    const current = persons.assign(words)?.label;
+    const choice = await sheet(`Wer ist „${written}“?`, [
+      ...persons.persons.map((p) => ({ value: `p:${p.label}`, label: p.label, hint: personNames(p), on: p.label === current })),
+      { value: 'new', label: 'Neue Person', hint: 'Eigenes Pseudonym für diesen Namen' },
+      { value: 'keep', label: 'Nicht ersetzen', hint: 'Dieser Name bleibt sichtbar' },
+    ]);
+    if (!choice) return;
+    if (choice === 'keep') return ed.keepName(words);
+    const label = choice === 'new' ? null : choice.slice(2);
+    if (label === current) return;
+    const p = persons.assignTo(words, label);
+    if (p) toast(`„${written}“ ist jetzt ${p.label}`);
+    ed.draw();
+    update();
+  };
   update();
   if (!lines.length) toast('Kein Text erkannt. Bereiche bitte von Hand abdecken.', 4500);
 

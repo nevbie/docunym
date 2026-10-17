@@ -17,7 +17,9 @@ Android-App zum Anonymisieren von fotografierten Dokumenten und Screenshots, **k
    **Pseudonym** (nur Namen: „Person A“, „Person B“ …) oder **Behalten**.
    Beispiel: Namen → Pseudonym, Adressen → Schwärzen, Zahlen → Behalten.
    Die **Personen-Liste** merkt sich lokal, welche Person welches Pseudonym hat – so bleibt „Max Mayer“ auch in
-   späteren Bildern „Person A“ („Mayer“ allein ebenfalls). Pseudonyme lassen sich umbenennen oder löschen.
+   späteren Bildern „Person A“ („Frau Mayer“ ebenfalls). Jede Person bekommt genau ein Pseudonym.
+   Falsch zugeordnet? Im Bild den Namen antippen und die richtige Person (oder „Neue Person“) wählen – die
+   Zuordnung wird gemerkt. In der Personen-Liste lassen sich Pseudonyme umbenennen, zusammenführen und löschen.
 5. **Speichern** legt ein neues JPEG unter `Bilder/Anonymisiert` ab, **Teilen** öffnet das Android-Teilen-Menü.
 
 ## Datenschutz

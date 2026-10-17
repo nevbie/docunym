@@ -36,6 +36,18 @@ sachbearbeiterin absender empfänger unterschrift gez schüler schülerin kind m
 antragstellerin arbeitnehmer arbeitnehmerin mieter mieterin vermieter vermieterin erziehungsberechtigte
 erziehungsberechtigter kontoinhaber kontoinhaberin auftraggeber bearbeiter
 `.trim().split(/\s+/));
+// Capitalised words that often follow a name or a label in documents but are never names.
+export const NOT_NAMES = new Set(`
+e-mail email mail tel telefon telefax fax mobil handy web www internet iban bic konto kontonummer bank nr nummer
+datum betreff seite anlage anlagen adresse anschrift straße strasse postfach ort plz geburtsdatum geburtsort
+herren damen sehr geehrte geehrter mit freundlichen grüßen grüße ihre ihr ihren sie wir ich und oder der die das
+den dem des ein eine bitte danke vielen dank vom von bis am im zum zur für per gmbh ag kg ug ev e.v mbh co
+unterschrift vertreten vertreter geschäftsführer geschäftsführerin vorstand amtsgericht steuernummer ust-idnr
+deutschland österreich schweiz berlin hamburg münchen köln frankfurt stuttgart düsseldorf leipzig dortmund essen
+bremen dresden hannover nürnberg duisburg bochum wuppertal bielefeld bonn münster mannheim karlsruhe augsburg
+wiesbaden kiel aachen kassel mainz freiburg erfurt rostock wien zürich
+`.trim().split(/\s+/));
+
 // Academic titles: skipped (not redacted) between a trigger and the name.
 export const TITLES = new Set(['dr', 'prof', 'med', 'dipl', 'ing', 'rer', 'nat', 'phil', 'jur', 'mag', 'ba', 'ma', 'msc', 'bsc']);
 export const NAME_PARTICLES = new Set(['von', 'van', 'de', 'der', 'zu', 'vom', 'den', 'di', 'da', 'el', 'al']);

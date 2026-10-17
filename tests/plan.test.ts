@@ -92,3 +92,65 @@ describe('planRedactions', () => {
     expect(items.filter((i) => i.type === 'black').length).toBe(3);
   });
 });
+
+describe('PersonRegistry: one person, one pseudonym', () => {
+  it('"Berta Müller" and "Frau Müller" are the same person, in either order', () => {
+    const r = new PersonRegistry();
+    expect(r.assign(['Müller'])!.label).toBe('Person A');
+    expect(r.assign(['Berta', 'Müller'])!.label).toBe('Person A');
+    const r2 = new PersonRegistry();
+    expect(r2.assign(['Berta', 'Müller'])!.label).toBe('Person A');
+    expect(r2.assign(['Müller,'])!.label).toBe('Person A');
+  });
+
+  it('finds a person whose name was stored with an extra word', () => {
+    const r = new PersonRegistry();
+    r.persons = [{ label: 'Person B', first: ['elisabeth', 'birkhold'], last: ['nürnberg'] }];
+    expect(r.assign(['Elisabeth', 'Birkhold'])!.label).toBe('Person B');
+  });
+
+  it('manual assignment wins and survives reloading', () => {
+    let stored: string | null = null;
+    const store = { get: () => stored, set: (v: string) => { stored = v; } };
+    const r = new PersonRegistry(store);
+    r.assign(['Berta', 'Müller']);
+    r.assign(['Kurt', 'Schulze']);
+    r.assignTo(['Frau', 'Schulze'].slice(1), 'Person A'); // "Schulze" here means Berta
+    expect(new PersonRegistry(store).assign(['Schulze'])!.label).toBe('Person A');
+    expect(new PersonRegistry(store).assign(['Kurt', 'Schulze'])!.label).toBe('Person B');
+    // new person on demand
+    expect(r.assignTo(['Hans', 'Muster'], null)!.label).toBe('Person C');
+  });
+
+  it('merges two persons', () => {
+    const r = new PersonRegistry();
+    r.assign(['Elisabeth', 'Birkhold']);
+    r.assign(['Lisa', 'B.']);
+    r.merge('Person B', 'Person A');
+    expect(r.persons.map((p) => p.label)).toEqual(['Person A']);
+    expect(r.assign(['Lisa'])!.label).toBe('Person A');
+  });
+});
+
+describe('name detection limits', () => {
+  it('does not take the word after the surname or document words', async () => {
+    const { detectKinds } = await import('../src/core/detect');
+    const m = (s: string) => { const w = s.split(' '); const k = detectKinds([w])[0]; return w.filter((_, i) => k[i] === 'name'); };
+    expect(m('Elisabeth Birkhold Nürnberg')).toEqual(['Elisabeth', 'Birkhold']);
+    expect(m('Frau Berta Kowalczyk')).toEqual(['Berta', 'Kowalczyk']);
+    expect(m('Frau Anna Maria Kowalczyk')).toEqual(['Anna', 'Maria', 'Kowalczyk']);
+    expect(m('Name: E E-Mail')).toEqual([]);
+    expect(m('Kontakt E-Mail Telefon')).toEqual([]);
+  });
+});
+
+describe('manual assignment cleanup', () => {
+  it('removes a person that only existed for the reassigned name', () => {
+    const r = new PersonRegistry();
+    r.assign(['Sabine', 'Brettschneider']);
+    r.assign(['Thomas', 'Quast']);
+    r.assignTo(['Thomas', 'Quast'], 'Person A');
+    expect(r.persons.map((p) => p.label)).toEqual(['Person A']);
+    expect(r.assign(['Thomas', 'Quast'])!.label).toBe('Person A');
+  });
+});

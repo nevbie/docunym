@@ -4,7 +4,7 @@ import {
   anonymousFileName, CATEGORY_OF, Dummies, findPersonalData, manualFinding,
   type Box, type Category, type Finding, type OcrLine,
 } from './core/detect';
-import { actionFor, planRedactions, type Action, type Actions } from './core/plan';
+import { actionFor, groupNames, planRedactions, type Action, type Actions } from './core/plan';
 import type { PersonRegistry } from './core/persons';
 import { ColorSampler, drawItems } from './render';
 
@@ -21,6 +21,8 @@ export class Editor {
   manual: Box[] = [];
   preview = false;
   onChange: () => void = () => {};
+  /** Tap on a pseudonymised name: lets the user pick the person. */
+  onPseudoTap: ((words: string[]) => void) | null = null;
 
   private colors: ColorSampler;
   private history: Snapshot[] = [];
@@ -91,6 +93,19 @@ export class Editor {
     this.lines.forEach((l, li) => l.words.forEach((_, wi) => {
       if (!have.has(`${li}:${wi}`)) this.findings.push(manualFinding(this.lines, li, wi, this.dummies));
     }));
+    this.changed();
+  }
+  /** Remembers the pseudonyms of this picture now (before a manual assignment, so all its persons are listed). */
+  commitPseudonyms(): void {
+    planRedactions(this.findings, this.manual, this.actions, this.persons);
+  }
+
+  /** Leaves this written name (all its words) as it is. */
+  keepName(words: string[]): void {
+    this.remember();
+    for (const g of groupNames(this.findings)) {
+      if (g.map((t) => t.text).join(' ') === words.join(' ')) for (const t of g) { t.active = false; t.manual = false; }
+    }
     this.changed();
   }
   setPreview(p: boolean): void { this.preview = p; this.draw(); }
@@ -273,6 +288,11 @@ export class Editor {
       if (inside(this.manual[i], 0)) { this.remember(); this.manual.splice(i, 1); this.changed(); return; }
     }
     const f = this.findings.find((t) => inside(t.bbox, slack));
+    if (f && this.onPseudoTap && actionFor(f, this.actions) === 'pseudo') {
+      const group = groupNames(this.findings).find((g) => g.includes(f))!;
+      this.onPseudoTap(group.map((t) => t.text));
+      return;
+    }
     if (f) {
       this.remember();
       if (actionFor(f, this.actions)) { f.active = false; f.manual = false; }

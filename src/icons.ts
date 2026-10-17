@@ -19,6 +19,7 @@ export const icons = {
   next: svg('<path d="M9 5l7 7-7 7"/>'),
   check: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
   person: svg('<circle cx="12" cy="8" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>'),
+  merge: svg('<path d="M6 4v5a6 6 0 0 0 6 6h0a6 6 0 0 1 6 6"/><path d="M18 4v5a6 6 0 0 1-6 6"/><path d="M15 18l3 3 3-3"/>'),
   pen: svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'),
   trash: svg('<path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13"/>'),
   keep: svg('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
