@@ -1,0 +1,58 @@
+name: Android APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - run: npm run build
+      - run: npx cap sync android
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      # Privacy guarantee: fail the build if the app could ever reach the network.
+      - name: Check APK has no internet permission
+        run: |
+          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt2 | tail -1)
+          $AAPT dump permissions android/app/build/outputs/apk/release/app-release.apk | tee perms.txt
+          ! grep -q "android.permission.INTERNET" perms.txt
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk anonymisierer.apk
+
+      # Releases instead of build artifacts: they don't count against the account's artifact storage
+      # and the APK can be downloaded directly on the phone. Only main publishes ("latest");
+      # other branches just check that the APK builds.
+      - name: Publish release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete preview --yes --cleanup-tag || true
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest anonymisierer.apk --target "$GITHUB_SHA" \
+            --title "Anonymisierer 0.1.${{ github.run_number }}" \
+            --notes "Auf dem Android-Handy anonymisierer.apk herunterladen und installieren."
